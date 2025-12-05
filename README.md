@@ -10,6 +10,8 @@
 
 *Fast, reliable, and user-friendly Confluence backup solution*
 
+![DumpConfluence CLI](assets/cli-demo.png)
+
 </div>
 
 ---
