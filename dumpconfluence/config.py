@@ -1,16 +1,16 @@
 """Configuration management for DumpConfluence"""
 
-import os
 import json
-from pathlib import Path
-from typing import Dict, Optional, List
+import os
 import platform
+from pathlib import Path
+from typing import Dict, List, Optional
 
 
 class ConfigManager:
     """Manage profiles and configuration"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Determine config directory based on OS
         if platform.system() == "Windows":
             config_home = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
@@ -30,24 +30,20 @@ class ConfigManager:
         """Load configuration from file"""
         if self.config_file.exists():
             try:
-                with open(self.config_file, 'r') as f:
+                with open(self.config_file) as f:
                     return json.load(f)
             except Exception:
                 return {"profiles": {}}
         return {"profiles": {}}
 
-    def _save_config(self):
+    def _save_config(self) -> None:
         """Save configuration to file"""
-        with open(self.config_file, 'w') as f:
+        with open(self.config_file, "w") as f:
             json.dump(self.config, f, indent=2)
 
-    def save_profile(self, name: str, url: str, email: str, token: str):
+    def save_profile(self, name: str, url: str, email: str, token: str) -> None:
         """Save a profile with credentials"""
-        self.config["profiles"][name] = {
-            "url": url,
-            "email": email,
-            "token": token
-        }
+        self.config["profiles"][name] = {"url": url, "email": email, "token": token}
         self._save_config()
 
     def load_profile(self, name: str) -> Optional[Dict]:

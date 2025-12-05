@@ -2,19 +2,17 @@
 
 import json
 import logging
-import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union
-from urllib.parse import urlparse
+from typing import Any, Dict, Optional, Tuple
 
 import requests
 from bs4 import BeautifulSoup
 from rich.console import Console
 
-from .exceptions import AuthenticationError, FileSystemError, NetworkError, ValidationError
 from . import __version__
+from .exceptions import AuthenticationError, NetworkError, ValidationError
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -64,28 +62,25 @@ class ConfluenceBackup:
             raise ValidationError("API token cannot be empty")
 
         # Validate URL format
-        if not confluence_url.startswith(('http://', 'https://')):
+        if not confluence_url.startswith(("http://", "https://")):
             raise ValidationError("Confluence URL must start with http:// or https://")
 
         # Validate email format (basic check)
-        if '@' not in email or '.' not in email:
+        if "@" not in email or "." not in email:
             raise ValidationError("Invalid email format")
 
-        self.confluence_url = confluence_url.rstrip('/')
+        self.confluence_url = confluence_url.rstrip("/")
         self.email = email.strip()
         self.api_token = api_token.strip()
         self.output_dir = Path(output_dir)
         self.auth = (self.email, self.api_token)
-        self.headers = {
-            "Accept": "application/json",
-            "User-Agent": f"DumpConfluence/{__version__}"
-        }
+        self.headers = {"Accept": "application/json", "User-Agent": f"DumpConfluence/{__version__}"}
 
         # Ensure output directory exists
         try:
             self.output_dir.mkdir(parents=True, exist_ok=True)
         except (PermissionError, OSError) as e:
-            raise ValidationError(f"Cannot create output directory '{output_dir}': {e}")
+            raise ValidationError(f"Cannot create output directory '{output_dir}': {e}") from e
 
     @staticmethod
     def extract_page_id(url: str) -> Optional[str]:
@@ -106,9 +101,9 @@ class ConfluenceBackup:
             return None
 
         try:
-            parts = url.rstrip('/').split('/')
+            parts = url.rstrip("/").split("/")
             for i, part in enumerate(parts):
-                if part == 'pages' and i + 1 < len(parts):
+                if part == "pages" and i + 1 < len(parts):
                     # Validate that the page ID is numeric
                     page_id = parts[i + 1]
                     if page_id.isdigit():
@@ -137,13 +132,13 @@ class ConfluenceBackup:
 
         # Replace invalid characters with underscore
         invalid_chars = r'[<>:"/\\|?*\x00-\x1f]'
-        safe_name = re.sub(invalid_chars, '_', filename)
+        safe_name = re.sub(invalid_chars, "_", filename)
 
         # Remove multiple consecutive underscores
-        safe_name = re.sub(r'_+', '_', safe_name)
+        safe_name = re.sub(r"_+", "_", safe_name)
 
         # Strip leading/trailing underscores and whitespace
-        safe_name = safe_name.strip('_ ')
+        safe_name = safe_name.strip("_ ")
 
         # Limit length and ensure not empty
         safe_name = safe_name[:200] if safe_name else "untitled"
@@ -169,9 +164,7 @@ class ConfluenceBackup:
             raise ValidationError(f"Invalid page ID: '{page_id}'. Must be numeric.")
 
         url = f"{self.confluence_url}/wiki/rest/api/content/{page_id}"
-        params = {
-            "expand": "body.storage,children.page,ancestors,version,space"
-        }
+        params = {"expand": "body.storage,children.page,ancestors,version,space"}
 
         try:
             logger.debug(f"Fetching page details for ID: {page_id}")
@@ -180,7 +173,7 @@ class ConfluenceBackup:
                 auth=self.auth,
                 headers=self.headers,
                 params=params,
-                timeout=30
+                timeout=30,
             )
 
             if response.status_code == 401:
@@ -193,16 +186,16 @@ class ConfluenceBackup:
             response.raise_for_status()
             return response.json()
 
-        except requests.exceptions.Timeout:
-            raise NetworkError("Request timeout. The Confluence server took too long to respond.")
-        except requests.exceptions.ConnectionError:
-            raise NetworkError(f"Cannot connect to Confluence server: {self.confluence_url}")
+        except requests.exceptions.Timeout as e:
+            raise NetworkError("Request timeout. The Confluence server took too long to respond.") from e
+        except requests.exceptions.ConnectionError as e:
+            raise NetworkError(f"Cannot connect to Confluence server: {self.confluence_url}") from e
         except requests.exceptions.HTTPError as e:
-            raise NetworkError(f"HTTP error {e.response.status_code}: {e.response.reason}")
+            raise NetworkError(f"HTTP error {e.response.status_code}: {e.response.reason}") from e
         except requests.exceptions.RequestException as e:
-            raise NetworkError(f"Network error: {str(e)}")
-        except json.JSONDecodeError:
-            raise NetworkError("Invalid response from Confluence API")
+            raise NetworkError(f"Network error: {e!s}") from e
+        except json.JSONDecodeError as e:
+            raise NetworkError("Invalid response from Confluence API") from e
 
     def download_image(self, page_id: str, filename: str, save_path: Path) -> bool:
         """Download a single image"""
@@ -211,71 +204,70 @@ class ConfluenceBackup:
             response = requests.get(img_url, auth=self.auth, stream=True, timeout=30)
             response.raise_for_status()
 
-            with open(save_path, 'wb') as f:
+            with open(save_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
 
             return True
         except Exception as e:
-            console.print(f"[yellow]⚠ Failed to download {filename}: {str(e)}[/yellow]")
+            console.print(f"[yellow]⚠ Failed to download {filename}: {e!s}[/yellow]")
             return False
 
     def process_code_blocks(self, soup: BeautifulSoup) -> None:
         """Process Confluence code blocks and convert them to HTML"""
         # Find all structured macro elements (code blocks, etc.)
-        macros = soup.find_all('ac:structured-macro')
+        macros = soup.find_all("ac:structured-macro")
 
         for macro in macros:
-            macro_name = macro.get('ac:name', '')
+            macro_name = macro.get("ac:name", "")
 
-
-            if macro_name == 'code':
+            if macro_name == "code":
                 # Extract language and code content
-                language = 'text'
-                code_content = ''
+                language = "text"
+                code_content = ""
 
                 # Get language from parameters
-                for param in macro.find_all('ac:parameter'):
-                    param_name = param.get('ac:name', '')
-                    if param_name == 'language':
-                        language = param.get_text(strip=True) or 'text'
-                    elif param_name == 'title':
+                for param in macro.find_all("ac:parameter"):
+                    param_name = param.get("ac:name", "")
+                    if param_name == "language":
+                        language = param.get_text(strip=True) or "text"
+                    elif param_name == "title":
                         # Could add title support later
                         pass
 
                 # Get code content from plain-text-body or rich-text-body
-                body = macro.find('ac:plain-text-body')
+                body = macro.find("ac:plain-text-body")
                 if body:
                     code_content = body.get_text()
                 else:
-                    body = macro.find('ac:rich-text-body')
+                    body = macro.find("ac:rich-text-body")
                     if body:
                         code_content = body.get_text()
 
                 # Create new code block HTML with line numbers
                 if code_content:
                     # Create wrapper div for code block
-                    code_wrapper = soup.new_tag('div')
-                    code_wrapper['class'] = 'code-block'
+                    code_wrapper = soup.new_tag("div")
+                    code_wrapper["class"] = "code-block"
 
                     # Create line numbers column
-                    lines = code_content.strip().split('\n')
-                    line_numbers_div = soup.new_tag('div')
-                    line_numbers_div['class'] = 'line-numbers'
+                    lines = code_content.strip().split("\n")
+                    line_numbers_div = soup.new_tag("div")
+                    line_numbers_div["class"] = "line-numbers"
 
                     for i in range(1, len(lines) + 1):
-                        line_num = soup.new_tag('span')
-                        line_num['class'] = 'line-number'
+                        line_num = soup.new_tag("span")
+                        line_num["class"] = "line-number"
                         line_num.string = str(i)
                         line_numbers_div.append(line_num)
                         if i < len(lines):
-                            line_numbers_div.append(soup.new_string('\n'))
+                            line_numbers_div.append(soup.new_string("\n"))
 
                     # Create code content
-                    pre_tag = soup.new_tag('pre')
-                    pre_tag['class'] = f'code-content language-{language}'
+                    pre_tag = soup.new_tag("pre")
+                    pre_tag["class"] = f"code-content language-{language}"
 
-                    code_tag = soup.new_tag('code')
+                    code_tag = soup.new_tag("code")
                     code_tag.string = code_content.strip()
 
                     pre_tag.append(code_tag)
@@ -289,102 +281,101 @@ class ConfluenceBackup:
                     # If no content, just remove the macro
                     macro.decompose()
 
-            elif macro_name in ['info', 'warning', 'note', 'tip', 'error']:
+            elif macro_name in ["info", "warning", "note", "tip", "error"]:
                 # Convert alert/info macros to divs
                 alert_type = macro_name
 
                 # Check for type parameter in info macro (Confluence often uses this)
-                if macro_name == 'info':
-                    for param in macro.find_all('ac:parameter'):
-                        param_name = param.get('ac:name', '')
+                if macro_name == "info":
+                    for param in macro.find_all("ac:parameter"):
+                        param_name = param.get("ac:name", "")
                         param_value = param.get_text(strip=True).lower()
 
                         # Check multiple parameter names that could indicate type
-                        if param_name in ['type', 'title', 'icon']:
+                        if param_name in ["type", "title", "icon"]:
                             # Map various Confluence type values to our types
                             type_mappings = {
-                                'warning': 'warning',
-                                'warn': 'warning',
-                                'caution': 'warning',
-                                'attention': 'warning',
-                                'note': 'note',
-                                'tip': 'tip',
-                                'info': 'info',
-                                'error': 'error',
-                                'danger': 'error',
-                                'success': 'success',
-                                'check': 'success',
+                                "warning": "warning",
+                                "warn": "warning",
+                                "caution": "warning",
+                                "attention": "warning",
+                                "note": "note",
+                                "tip": "tip",
+                                "info": "info",
+                                "error": "error",
+                                "danger": "error",
+                                "success": "success",
+                                "check": "success",
                                 # Confluence sometimes uses different naming
-                                'yellow': 'warning',
-                                'orange': 'warning',
-                                'red': 'error',
-                                'green': 'success',
-                                'blue': 'info'
+                                "yellow": "warning",
+                                "orange": "warning",
+                                "red": "error",
+                                "green": "success",
+                                "blue": "info",
                             }
 
                             if param_value in type_mappings:
                                 alert_type = type_mappings[param_value]
                                 break
 
-
-                div_tag = soup.new_tag('div')
-                div_tag['class'] = f'confluence-{alert_type}'
-                div_tag['style'] = self._get_macro_style(alert_type)
-
+                div_tag = soup.new_tag("div")
+                div_tag["class"] = f"confluence-{alert_type}"
+                div_tag["style"] = self._get_macro_style(alert_type)
 
                 # Get content from rich-text-body
-                body = macro.find('ac:rich-text-body')
+                body = macro.find("ac:rich-text-body")
                 if body:
                     div_tag.extend(body.contents)
 
                 macro.replace_with(div_tag)
 
-            elif macro_name == 'toc':
+            elif macro_name == "toc":
                 # Convert table of contents to a simple heading
-                toc_div = soup.new_tag('div')
-                toc_div['class'] = 'confluence-toc'
-                toc_div['style'] = 'border: 1px solid #ccc; padding: 10px; margin: 10px 0; background: #f9f9f9;'
-                toc_div.string = '📋 Table of Contents (not rendered in export)'
+                toc_div = soup.new_tag("div")
+                toc_div["class"] = "confluence-toc"
+                toc_div["style"] = "border: 1px solid #ccc; padding: 10px; margin: 10px 0; background: #f9f9f9;"
+                toc_div.string = "Table of Contents (not rendered in export)"
 
                 macro.replace_with(toc_div)
 
     def _get_macro_style(self, macro_name: str) -> str:
         """Get CSS styles for different macro types"""
         styles = {
-            'info': 'background: #e6f3ff; padding: 12px; margin: 12px 0; border-radius: 3px;',
-            'warning': 'background: #fff4e6; padding: 12px; margin: 12px 0; border-radius: 3px;',
-            'note': 'background: #fff4e6; padding: 12px; margin: 12px 0; border-radius: 3px;',
-            'tip': 'background: #e3fcef; padding: 12px; margin: 12px 0; border-radius: 3px;',
-            'error': 'background: #ffebe6; padding: 12px; margin: 12px 0; border-radius: 3px;',
-            'success': 'background: #e3fcef; padding: 12px; margin: 12px 0; border-radius: 3px;'
+            "info": "background: #e6f3ff; padding: 12px; margin: 12px 0; border-radius: 3px;",
+            "warning": "background: #fff4e6; padding: 12px; margin: 12px 0; border-radius: 3px;",
+            "note": "background: #fff4e6; padding: 12px; margin: 12px 0; border-radius: 3px;",
+            "tip": "background: #e3fcef; padding: 12px; margin: 12px 0; border-radius: 3px;",
+            "error": "background: #ffebe6; padding: 12px; margin: 12px 0; border-radius: 3px;",
+            "success": "background: #e3fcef; padding: 12px; margin: 12px 0; border-radius: 3px;",
         }
-        return styles.get(macro_name, 'border-left: 4px solid #6B778C; background: #f4f5f7; padding: 12px; margin: 12px 0; border-radius: 3px;')
-
+        return styles.get(
+            macro_name, "border-left: 4px solid #6B778C; background: #f4f5f7; padding: 12px; margin: 12px 0; border-radius: 3px;"
+        )
 
     def process_images(self, html_content: str, page_id: str, images_dir: Path) -> Tuple[str, Dict]:
         """Download images and update HTML paths"""
         images_dir.mkdir(parents=True, exist_ok=True)
-        soup = BeautifulSoup(html_content, 'html.parser')
+        soup = BeautifulSoup(html_content, "html.parser")
 
         # First process code blocks and other macros
         self.process_code_blocks(soup)
 
         # Find Confluence image tags
-        ac_images = soup.find_all('ac:image')
-        downloaded_images = {}
-        counter = {}
+        ac_images = soup.find_all("ac:image")
+        downloaded_images: Dict[str, str] = {}
+        counter: Dict[str, int] = {}
 
         for idx, ac_img in enumerate(ac_images, 1):
-            attachment = ac_img.find('ri:attachment')
+            attachment = ac_img.find("ri:attachment")
             if not attachment:
                 continue
 
-            original_filename = attachment.get('ri:filename', f'image_{idx}.png')
+            original_filename = attachment.get("ri:filename", f"image_{idx}.png")
 
             # Handle duplicates
             if original_filename in counter:
                 counter[original_filename] += 1
-                name_parts = original_filename.rsplit('.', 1)
+                name_parts = original_filename.rsplit(".", 1)
                 if len(name_parts) == 2:
                     saved_filename = f"{name_parts[0]}_{counter[original_filename]}.{name_parts[1]}"
                 else:
@@ -399,13 +390,13 @@ class ConfluenceBackup:
                 downloaded_images[original_filename] = saved_filename
 
                 # Replace ac:image with standard img tag
-                new_img = soup.new_tag('img')
-                new_img['src'] = f"images/{saved_filename}"
-                new_img['alt'] = original_filename
-                new_img['style'] = "max-width: 100%; height: auto; margin: 10px 0;"
+                new_img = soup.new_tag("img")
+                new_img["src"] = f"images/{saved_filename}"
+                new_img["alt"] = original_filename
+                new_img["style"] = "max-width: 100%; height: auto; margin: 10px 0;"
 
-                if ac_img.get('ac:width'):
-                    new_img['width'] = ac_img.get('ac:width')
+                if ac_img.get("ac:width"):
+                    new_img["width"] = ac_img.get("ac:width")
 
                 ac_img.replace_with(new_img)
 
@@ -682,7 +673,7 @@ class ConfluenceBackup:
             html_content = self.generate_html(page_data, processed_body)
             html_path = page_dir / f"{safe_title}.html"
 
-            with open(html_path, 'w', encoding='utf-8') as f:
+            with open(html_path, "w", encoding="utf-8") as f:
                 f.write(html_content)
 
             # Save metadata
@@ -693,11 +684,11 @@ class ConfluenceBackup:
                 "created": page_data.get("version", {}).get("createdDate"),
                 "url": page_url,
                 "exported_at": datetime.now().isoformat(),
-                "images_downloaded": list(downloaded_images.values())
+                "images_downloaded": list(downloaded_images.values()),
             }
 
             metadata_path = page_dir / "metadata.json"
-            with open(metadata_path, 'w', encoding='utf-8') as f:
+            with open(metadata_path, "w", encoding="utf-8") as f:
                 json.dump(metadata, f, indent=2, ensure_ascii=False)
 
             return str(page_dir)
@@ -706,5 +697,5 @@ class ConfluenceBackup:
             console.print(f"[red]✗ HTTP Error: {e.response.status_code}[/red]")
             return None
         except Exception as e:
-            console.print(f"[red]✗ Error: {str(e)}[/red]")
+            console.print(f"[red]✗ Error: {e!s}[/red]")
             return None

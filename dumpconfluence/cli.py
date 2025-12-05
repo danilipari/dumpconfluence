@@ -1,41 +1,29 @@
 #!/usr/bin/env python3
 """Command-line interface for DumpConfluence"""
 
-import click
 import sys
-import os
 from pathlib import Path
 from typing import Optional
-from rich.console import Console
-from rich.prompt import Prompt
-from rich.progress import Progress, SpinnerColumn, TextColumn
-import json
 
-from .core import ConfluenceBackup
+import click
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.prompt import Prompt
+
+from . import __version__
 from .config import ConfigManager
+from .core import ConfluenceBackup
 from .exceptions import (
     AuthenticationError,
     ConfluenceBackupError,
     NetworkError,
     ValidationError,
 )
-from . import __version__
 
 console = Console()
 
-
-@click.group(invoke_without_command=True)
-@click.version_option(version=__version__, prog_name="DumpConfluence")
-@click.pass_context
-def cli(ctx):
-    """DumpConfluence - Backup Confluence pages with images and attachments"""
-    if ctx.invoked_subcommand is None:
-        # ASCII art banner with dynamic version
-        version_line = f"Confluence Backup Tool v{__version__} - by Dani Lipari"
-        # Center the version line in the banner (56 chars width)
-        centered_version = version_line.center(56)
-
-        console.print(f"""[bold cyan]
+# ASCII art banner as raw string to handle backslashes
+BANNER = r"""
 ╔════════════════════════════════════════════════════════╗
 ║                                                        ║
 ║    ____                         ____             __    ║
@@ -45,10 +33,24 @@ def cli(ctx):
 ║   |____/ \__,_|_| |_| |_| .__/ \____\___/|_| |_|_|     ║
 ║                         |_|                            ║
 ║                                                        ║
-║{centered_version}║
+║{version_line}║
 ║                                                        ║
 ╚════════════════════════════════════════════════════════╝
-        [/bold cyan]""")
+"""
+
+
+@click.group(invoke_without_command=True)
+@click.version_option(version=__version__, prog_name="DumpConfluence")
+@click.pass_context
+def cli(ctx: click.Context) -> None:
+    """DumpConfluence - Backup Confluence pages with images and attachments"""
+    if ctx.invoked_subcommand is None:
+        # ASCII art banner with dynamic version
+        version_line = f"Confluence Backup Tool v{__version__} - by Dani Lipari"
+        # Center the version line in the banner (56 chars width)
+        centered_version = version_line.center(56)
+
+        console.print(f"[bold cyan]{BANNER.format(version_line=centered_version)}[/bold cyan]")
 
         # Show saved profiles
         config = ConfigManager()
@@ -73,9 +75,9 @@ def cli(ctx):
                 console.print(f"   • [cyan]{profile}[/cyan]: {data['email']} @ {data['url']}{status_mark}")
 
             if len(profiles) == 1:
-                console.print(f"\n   [dim]Auto-selected profile:[/dim] [yellow]dumpconfluence backup URL[/yellow]")
+                console.print("\n   [dim]Auto-selected profile:[/dim] [yellow]dumpconfluence backup URL[/yellow]")
             elif default_profile:
-                console.print(f"\n   [dim]Default profile active:[/dim] [yellow]dumpconfluence backup URL[/yellow]")
+                console.print("\n   [dim]Default profile active:[/dim] [yellow]dumpconfluence backup URL[/yellow]")
             else:
                 console.print(f"\n   [dim]Set default:[/dim] [yellow]dumpconfluence config default {profiles[0]}[/yellow]")
         else:
@@ -90,26 +92,32 @@ def cli(ctx):
 
 
 @cli.command()
-@click.argument('page_url')
-@click.option('--url', '-u', help='Confluence base URL (e.g., https://company.atlassian.net)')
-@click.option('--email', '-e', help='Confluence account email')
-@click.option('--token', '-t', help='Confluence API token')
-@click.option('--output-dir', '-o', default='.', help='Output directory (default: current directory)')
-@click.option('--profile', '-p', help='Use saved profile')
-@click.option('--save-profile', help='Save credentials as profile')
-def backup(page_url: str, url: Optional[str], email: Optional[str], token: Optional[str],
-          output_dir: str, profile: Optional[str], save_profile: Optional[str]):
+@click.argument("page_url")
+@click.option("--url", "-u", help="Confluence base URL (e.g., https://company.atlassian.net)")
+@click.option("--email", "-e", help="Confluence account email")
+@click.option("--token", "-t", help="Confluence API token")
+@click.option("--output-dir", "-o", default=".", help="Output directory (default: current directory)")
+@click.option("--profile", "-p", help="Use saved profile")
+@click.option("--save-profile", help="Save credentials as profile")
+def backup(
+    page_url: str,
+    url: Optional[str],
+    email: Optional[str],
+    token: Optional[str],
+    output_dir: str,
+    profile: Optional[str],
+    save_profile: Optional[str],
+) -> None:
     """Backup a single Confluence page"""
-
     config = ConfigManager()
 
     # Auto-use profile if available and none specified
     if not profile and not any([url, email, token]):
         auto_profile = config.get_auto_profile()
         if auto_profile:
-            url = auto_profile.get('url')
-            email = auto_profile.get('email')
-            token = auto_profile.get('token')
+            url = auto_profile.get("url")
+            email = auto_profile.get("email")
+            token = auto_profile.get("token")
 
             profiles = config.list_profiles()
             if len(profiles) == 1:
@@ -122,9 +130,9 @@ def backup(page_url: str, url: Optional[str], email: Optional[str], token: Optio
     elif profile:
         profile_config = config.load_profile(profile)
         if profile_config:
-            url = url or profile_config.get('url')
-            email = email or profile_config.get('email')
-            token = token or profile_config.get('token')
+            url = url or profile_config.get("url")
+            email = email or profile_config.get("email")
+            token = token or profile_config.get("token")
             console.print(f"[green]✓ Using profile '[cyan]{profile}[/cyan]' ({email})[/green]")
         else:
             console.print(f"[red]Profile '{profile}' not found[/red]")
@@ -152,9 +160,9 @@ def backup(page_url: str, url: Optional[str], email: Optional[str], token: Optio
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
-            console=console
+            console=console,
         ) as progress:
-            task = progress.add_task("Backing up page...", total=None)
+            progress.add_task("Backing up page...", total=None)
 
             backup_client = ConfluenceBackup(url, email, token, str(output_path))
             result = backup_client.backup_page(page_url)
@@ -166,33 +174,32 @@ def backup(page_url: str, url: Optional[str], email: Optional[str], token: Optio
                 sys.exit(1)
 
     except ValidationError as e:
-        console.print(f"[red]Validation Error:[/red] {str(e)}")
+        console.print(f"[red]Validation Error:[/red] {e!s}")
         console.print("[yellow]Tip:[/yellow] Check the page URL format and credentials")
         sys.exit(1)
     except AuthenticationError as e:
-        console.print(f"[red]Authentication Error:[/red] {str(e)}")
+        console.print(f"[red]Authentication Error:[/red] {e!s}")
         console.print("[yellow]Tip:[/yellow] Verify your email and API token in the profile")
         sys.exit(1)
     except NetworkError as e:
-        console.print(f"[red]Network Error:[/red] {str(e)}")
+        console.print(f"[red]Network Error:[/red] {e!s}")
         console.print("[yellow]Tip:[/yellow] Check your internet connection and Confluence URL")
         sys.exit(1)
     except ConfluenceBackupError as e:
-        console.print(f"[red]Backup Error:[/red] {str(e)}")
+        console.print(f"[red]Backup Error:[/red] {e!s}")
         sys.exit(1)
     except Exception as e:
-        console.print(f"[red]Unexpected Error:[/red] {str(e)}")
+        console.print(f"[red]Unexpected Error:[/red] {e!s}")
         console.print("[dim]If this persists, please report it at: https://github.com/danilipari/dumpconfluence/issues[/dim]")
         sys.exit(1)
 
 
 @cli.command()
-@click.argument('file_path')
-@click.option('--profile', '-p', help='Use saved profile')
-@click.option('--output-dir', '-o', default='.', help='Output directory (default: current directory)')
-def batch(file_path: str, profile: Optional[str], output_dir: str):
+@click.argument("file_path")
+@click.option("--profile", "-p", help="Use saved profile")
+@click.option("--output-dir", "-o", default=".", help="Output directory (default: current directory)")
+def batch(file_path: str, profile: Optional[str], output_dir: str) -> None:
     """Backup multiple pages from a file with URLs"""
-
     config = ConfigManager()
 
     # Load profile
@@ -207,19 +214,19 @@ def batch(file_path: str, profile: Optional[str], output_dir: str):
 
     # Read URLs from file
     try:
-        with open(file_path, 'r') as f:
+        with open(file_path) as f:
             urls = [line.strip() for line in f if line.strip()]
     except Exception as e:
-        console.print(f"[red]Error reading file: {str(e)}[/red]")
+        console.print(f"[red]Error reading file: {e!s}[/red]")
         return
 
     console.print(f"[cyan]Found {len(urls)} URLs to backup[/cyan]")
 
     backup_client = ConfluenceBackup(
-        profile_config['url'],
-        profile_config['email'],
-        profile_config['token'],
-        output_dir
+        profile_config["url"],
+        profile_config["email"],
+        profile_config["token"],
+        output_dir,
     )
 
     # Backup each URL
@@ -232,23 +239,22 @@ def batch(file_path: str, profile: Optional[str], output_dir: str):
             else:
                 console.print(f"[yellow]⚠ Skipped: {url}[/yellow]")
         except Exception as e:
-            console.print(f"[red]✗ Failed: {str(e)}[/red]")
+            console.print(f"[red]✗ Failed: {e!s}[/red]")
 
 
 @cli.group()
-def config():
+def config() -> None:
     """Manage configuration and profiles"""
     pass
 
 
 @config.command()
-@click.argument('name')
-@click.option('--url', '-u', help='Confluence base URL')
-@click.option('--email', '-e', help='Confluence account email')
-@click.option('--token', '-t', help='Confluence API token')
-def add(name: str, url: Optional[str], email: Optional[str], token: Optional[str]):
+@click.argument("name")
+@click.option("--url", "-u", help="Confluence base URL")
+@click.option("--email", "-e", help="Confluence account email")
+@click.option("--token", "-t", help="Confluence API token")
+def add(name: str, url: Optional[str], email: Optional[str], token: Optional[str]) -> None:
     """Add a new profile"""
-
     # Interactive prompts
     if not url:
         url = Prompt.ask("Confluence URL", default="https://company.atlassian.net")
@@ -263,7 +269,7 @@ def add(name: str, url: Optional[str], email: Optional[str], token: Optional[str
 
 
 @config.command()
-def list():
+def list() -> None:
     """List all saved profiles"""
     config_mgr = ConfigManager()
     profiles = config_mgr.list_profiles()
@@ -279,8 +285,8 @@ def list():
 
 
 @config.command()
-@click.argument('name')
-def remove(name: str):
+@click.argument("name")
+def remove(name: str) -> None:
     """Remove a profile"""
     config_mgr = ConfigManager()
     if config_mgr.remove_profile(name):
@@ -290,8 +296,8 @@ def remove(name: str):
 
 
 @config.command()
-@click.argument('name')
-def default(name: str):
+@click.argument("name")
+def default(name: str) -> None:
     """Set a profile as default"""
     config_mgr = ConfigManager()
     if config_mgr.set_default_profile(name):
@@ -300,7 +306,7 @@ def default(name: str):
         console.print(f"[red]Profile '{name}' not found[/red]")
 
 
-def main():
+def main() -> None:
     cli()
 
 
