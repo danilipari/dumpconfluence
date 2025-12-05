@@ -12,7 +12,7 @@ version = "1.0.0"
 description = "CLI tool to backup Confluence pages with images and attachments"
 authors = [{name = "Dani Lipari", email = "lipari.assistenza@gmail.com"}]
 readme = "README.md"
-license = "MIT"
+license = {text = "MIT"}
 requires-python = ">=3.8"
 classifiers = [
     "Development Status :: 4 - Beta",
