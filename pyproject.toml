@@ -2,13 +2,17 @@
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+include = ["dumpconfluence*"]
+exclude = ["tests*", "assets*"]
+
 [project]
 name = "dumpconfluence"
 version = "1.0.0"
 description = "CLI tool to backup Confluence pages with images and attachments"
 authors = [{name = "Dani Lipari", email = "lipari.assistenza@gmail.com"}]
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "MIT"
 requires-python = ">=3.8"
 classifiers = [
     "Development Status :: 4 - Beta",

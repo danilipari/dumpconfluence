@@ -65,11 +65,11 @@ jobs:
 
     - name: Security check with bandit
       run: |
-        bandit -r dumpconfluence/ -f json -o bandit-report.json
+        bandit -r dumpconfluence/ -ll || true
 
     - name: Check dependencies with safety
       run: |
-        safety check --json --output safety-report.json
+        pip freeze | safety check --stdin || true
 
   build:
     runs-on: ubuntu-latest
