@@ -10,7 +10,7 @@
 
 *Fast, reliable, and user-friendly Confluence backup solution*
 
-![DumpConfluence CLI](assets/cli-demo.png)
+![DumpConfluence CLI](https://raw.githubusercontent.com/danilipari/dumpconfluence/main/assets/cli-demo.png)
 
 </div>
 

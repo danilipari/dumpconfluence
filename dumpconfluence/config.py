@@ -13,9 +13,13 @@ class ConfigManager:
     def __init__(self) -> None:
         # Determine config directory based on OS
         if platform.system() == "Windows":
-            config_home = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+            config_home = Path(
+                os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming")
+            )
         else:
-            config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+            config_home = Path(
+                os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")
+            )
 
         self.config_dir = config_home / "dumpconfluence"
         self.config_file = self.config_dir / "config.json"

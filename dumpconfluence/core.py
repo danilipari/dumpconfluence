@@ -40,7 +40,9 @@ class ConfluenceBackup:
         >>> print(f"Backup saved to: {result}")
     """
 
-    def __init__(self, confluence_url: str, email: str, api_token: str, output_dir: str = ".") -> None:
+    def __init__(
+        self, confluence_url: str, email: str, api_token: str, output_dir: str = "."
+    ) -> None:
         """
         Initialize the ConfluenceBackup instance.
 
@@ -74,13 +76,18 @@ class ConfluenceBackup:
         self.api_token = api_token.strip()
         self.output_dir = Path(output_dir)
         self.auth = (self.email, self.api_token)
-        self.headers = {"Accept": "application/json", "User-Agent": f"DumpConfluence/{__version__}"}
+        self.headers = {
+            "Accept": "application/json",
+            "User-Agent": f"DumpConfluence/{__version__}",
+        }
 
         # Ensure output directory exists
         try:
             self.output_dir.mkdir(parents=True, exist_ok=True)
         except (PermissionError, OSError) as e:
-            raise ValidationError(f"Cannot create output directory '{output_dir}': {e}") from e
+            raise ValidationError(
+                f"Cannot create output directory '{output_dir}': {e}"
+            ) from e
 
     @staticmethod
     def extract_page_id(url: str) -> Optional[str]:
@@ -177,9 +184,13 @@ class ConfluenceBackup:
             )
 
             if response.status_code == 401:
-                raise AuthenticationError("Authentication failed. Check your email and API token.")
+                raise AuthenticationError(
+                    "Authentication failed. Check your email and API token."
+                )
             elif response.status_code == 403:
-                raise AuthenticationError("Access denied. You don't have permission to access this page.")
+                raise AuthenticationError(
+                    "Access denied. You don't have permission to access this page."
+                )
             elif response.status_code == 404:
                 raise ValidationError(f"Page with ID '{page_id}' not found.")
 
@@ -187,11 +198,17 @@ class ConfluenceBackup:
             return response.json()
 
         except requests.exceptions.Timeout as e:
-            raise NetworkError("Request timeout. The Confluence server took too long to respond.") from e
+            raise NetworkError(
+                "Request timeout. The Confluence server took too long to respond."
+            ) from e
         except requests.exceptions.ConnectionError as e:
-            raise NetworkError(f"Cannot connect to Confluence server: {self.confluence_url}") from e
+            raise NetworkError(
+                f"Cannot connect to Confluence server: {self.confluence_url}"
+            ) from e
         except requests.exceptions.HTTPError as e:
-            raise NetworkError(f"HTTP error {e.response.status_code}: {e.response.reason}") from e
+            raise NetworkError(
+                f"HTTP error {e.response.status_code}: {e.response.reason}"
+            ) from e
         except requests.exceptions.RequestException as e:
             raise NetworkError(f"Network error: {e!s}") from e
         except json.JSONDecodeError as e:
@@ -333,7 +350,9 @@ class ConfluenceBackup:
                 # Convert table of contents to a simple heading
                 toc_div = soup.new_tag("div")
                 toc_div["class"] = "confluence-toc"
-                toc_div["style"] = "border: 1px solid #ccc; padding: 10px; margin: 10px 0; background: #f9f9f9;"
+                toc_div["style"] = (
+                    "border: 1px solid #ccc; padding: 10px; margin: 10px 0; background: #f9f9f9;"
+                )
                 toc_div.string = "Table of Contents (not rendered in export)"
 
                 macro.replace_with(toc_div)
@@ -349,10 +368,13 @@ class ConfluenceBackup:
             "success": "background: #e3fcef; padding: 12px; margin: 12px 0; border-radius: 3px;",
         }
         return styles.get(
-            macro_name, "border-left: 4px solid #6B778C; background: #f4f5f7; padding: 12px; margin: 12px 0; border-radius: 3px;"
+            macro_name,
+            "border-left: 4px solid #6B778C; background: #f4f5f7; padding: 12px; margin: 12px 0; border-radius: 3px;",
         )
 
-    def process_images(self, html_content: str, page_id: str, images_dir: Path) -> Tuple[str, Dict]:
+    def process_images(
+        self, html_content: str, page_id: str, images_dir: Path
+    ) -> Tuple[str, Dict]:
         """Download images and update HTML paths"""
         images_dir.mkdir(parents=True, exist_ok=True)
         soup = BeautifulSoup(html_content, "html.parser")
@@ -377,7 +399,9 @@ class ConfluenceBackup:
                 counter[original_filename] += 1
                 name_parts = original_filename.rsplit(".", 1)
                 if len(name_parts) == 2:
-                    saved_filename = f"{name_parts[0]}_{counter[original_filename]}.{name_parts[1]}"
+                    saved_filename = (
+                        f"{name_parts[0]}_{counter[original_filename]}.{name_parts[1]}"
+                    )
                 else:
                     saved_filename = f"{original_filename}_{counter[original_filename]}"
             else:
@@ -631,7 +655,7 @@ class ConfluenceBackup:
     <div class="metadata">
         <strong>Space:</strong> {space} |
         <strong>Page ID:</strong> {page_id} |
-        <strong>Exported:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        <strong>Exported:</strong> {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
     </div>
     <div class="content">
         {processed_body}
@@ -664,10 +688,14 @@ class ConfluenceBackup:
 
             # Process images
             images_dir = page_dir / "images"
-            processed_body, downloaded_images = self.process_images(body, page_id, images_dir)
+            processed_body, downloaded_images = self.process_images(
+                body, page_id, images_dir
+            )
 
             if downloaded_images:
-                console.print(f"[green]✓ Downloaded {len(downloaded_images)} images[/green]")
+                console.print(
+                    f"[green]✓ Downloaded {len(downloaded_images)} images[/green]"
+                )
 
             # Generate and save HTML
             html_content = self.generate_html(page_data, processed_body)
