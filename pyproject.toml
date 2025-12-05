@@ -8,7 +8,7 @@ exclude = ["tests*", "assets*"]
 
 [project]
 name = "dumpconfluence"
-version = "1.0.0"
+version = "1.0.1"
 description = "CLI tool to backup Confluence pages with images and attachments"
 authors = [{name = "Dani Lipari", email = "lipari.assistenza@gmail.com"}]
 readme = "README.md"
